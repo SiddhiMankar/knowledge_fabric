@@ -1,0 +1,24 @@
+Pump P-101 experienced seal leakage after 500 operating hours. The leakage was first detected on 2023-10-15. During inspection, abnormal vibration (0.5 mm/s) was also noted, which is above the acceptable limit of 0.2 mm/s. The pump was taken offline for maintenance on 2023-10-16. Bearing wear was observed during inspection. The root cause analysis indicated that the lubricant viscosity was incorrect for the operating temperature. SOP-04 specifies the use of ISO VG 46 oil for this pump, but ISO VG 68 was used. SOP-23 states that lubrication should be performed every 500 operating hours; the last lubrication was 480 hours ago.
+
+Maintenance Actions Performed:
+1. Replaced shaft seal (Part No. 12345)
+2. Replaced bearing assembly (Part No. 67890)
+3. Cleaned pump casing
+4. Refilled with correct lubricant (ISO VG 46)
+5. Performed alignment check (alignment within tolerance)
+
+Findings:
+- The previous lubricant (ISO VG 68) was causing excessive heat generation.
+- Bearing wear was likely accelerated due to high operating temperatures.
+- Vibration levels dropped to 0.15 mm/s after maintenance.
+
+Recommendations:
+1. Update maintenance checklist to include lubricant viscosity verification.
+2. Implement vibration monitoring for critical pumps.
+3. Conduct follow-up inspection after 100 operating hours.
+
+Records:
+- Maintenance Request: MR-2023-456
+- Parts Used: [List]
+- Technician: John Doe
+- Cost: $1250.00
