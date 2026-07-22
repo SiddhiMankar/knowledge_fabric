@@ -1,5 +1,10 @@
 import os
+from dotenv import load_dotenv
 import streamlit as st
+
+# Load environment variables from .env file
+load_dotenv()
+
 from ingestion.loader import load_document
 from processing.chunker import chunk_document, save_chunks
 from retrieval.vector_store import search, index_chunks
@@ -236,6 +241,27 @@ with tab2:
                         metadatas = results['metadatas'][0] if 'metadatas' in results else []
                         distances = results['distances'][0] if 'distances' in results else []
                         
+                        # Generate RAG answer
+                        st.markdown('<div class="section-title">🤖 AI Assistant Response</div>', unsafe_allow_html=True)
+                        try:
+                            from retrieval.rag import generate_answer
+                            rag_response = generate_answer(query, results)
+                            
+                            st.markdown(f"""
+                            <div class="rag-card" style="border: 1px solid rgba(168, 85, 247, 0.2); border-radius:12px; padding:20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%); margin-bottom:25px; box-shadow: 0 4px 20px rgba(168, 85, 247, 0.05)">
+                                <div style="font-size:1.15rem; font-weight:600; color:#f8fafc; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+                                    <span>✨ Synthesized Answer</span>
+                                    <span style="background-color:rgba(168, 85, 247, 0.1); color:#c084fc; border: 1px solid rgba(168, 85, 247, 0.2); padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">RAG Engine</span>
+                                </div>
+                                <div style="font-family:sans-serif; font-size:0.95rem; color:#e2e8f0; line-height:1.6; white-space:pre-wrap; text-align:left;">{rag_response['answer']}</div>
+                                <div style="margin-top:15px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); font-size:0.8rem; color:#94a3b8;">
+                                    <strong>Consulted Sources:</strong> {", ".join(rag_response['sources'])}
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                        except Exception as re:
+                            st.error(f"RAG generation failed: {re}")
+                            
                         st.markdown(f"### Found {len(docs)} matching chunks:")
                         
                         for i, doc in enumerate(docs):
