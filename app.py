@@ -8,6 +8,33 @@ load_dotenv()
 from ingestion.loader import load_document
 from processing.chunker import chunk_document, save_chunks
 from retrieval.vector_store import search, index_chunks
+import re
+from html import unescape
+
+def clean_llm_text(text: str) -> str:
+    """Sanitize LLM output by unescaping HTML entities and stripping any HTML tags."""
+    if not text:
+        return ""
+    text = unescape(text)
+    text = re.sub(r"<[^>]+>", "", text)
+    return text.strip()
+
+def render_answer_card(rag_response: dict):
+    """Render the AI answer in a styled card."""
+    answer = rag_response.get("answer", "")
+    answer = clean_llm_text(answer)
+    st.markdown(
+        f"""
+        <div style=\"border: 1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px; background-color:#0f172a; margin-bottom:20px;\">
+            <div style=\"font-size:1.2rem; font-weight:600; color:#f8fafc;\">{answer}</div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+def render_evidence_explorer(evidence_list):
+    """Placeholder for future evidence explorer component."""
+    return
 
 # Set page configuration with a premium title and layout
 st.set_page_config(
@@ -200,10 +227,10 @@ with tab1:
                     <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-bottom:15px; font-size:0.95rem; color:#94a3b8">
                         {meta_html}
                     </div>
-                    <div style="font-size:0.75rem; color:#64748b; text-transform:uppercase; font-weight:700; margin-bottom:5px">First Chunk Text Preview ({first_chunk_id})</div>
-                    <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.05); border-radius:6px; padding:12px; font-family:monospace; white-space:pre-wrap; max-height:250px; overflow-y:auto; font-size:0.85rem; color:#cbd5e1; text-align:left">{first_chunk_text}</div>
                 </div>
                 """, unsafe_allow_html=True)
+                st.markdown(f"**First Chunk Text Preview ({first_chunk_id})**")
+                st.code(clean_llm_text(first_chunk_text), language="text")
                 
             except Exception as e:
                 st.error(f"Failed to process {os.path.basename(file_path)}: {str(e)}")
@@ -220,7 +247,7 @@ with tab2:
         value="What causes seal leakage in pump P-101?",
         placeholder="e.g. What causes seal leakage in pump P-101?"
     )
-    
+
     col1, col2 = st.columns([3, 1])
     with col2:
         top_k = st.slider("Results (k)", min_value=1, max_value=10, value=3)
@@ -265,74 +292,33 @@ with tab2:
                             from retrieval.rag import generate_answer
                             rag_response = generate_answer(query, boosted_results, confidence=retrieval_confidence)
 
-                            # Root cause source badge
-                            rc_source = rag_response.get('root_cause_source')
-                            rc_conf   = rag_response.get('root_cause_confidence')
-                            rc_name   = rag_response.get('root_cause')
+                            # Render answer using premium component (cleaned text)
+                            render_answer_card(rag_response)
 
-                            if rc_source == 'knowledge_graph' and rc_name:
-                                rc_badge_html = f"""
-                                <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
-                                    <span style="background:rgba(59,130,246,0.12); color:#60a5fa; border:1px solid rgba(59,130,246,0.3); padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
-                                        🕸️ Root cause source: Knowledge Graph
-                                    </span>
-                                    <span style="background:rgba(52,211,153,0.1); color:#34d399; border:1px solid rgba(52,211,153,0.25); padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
-                                        ✅ {rc_name} &nbsp;·&nbsp; confidence {rc_conf}
-                                    </span>
-                                    <span style="background:rgba(168,85,247,0.1); color:#c084fc; border:1px solid rgba(168,85,247,0.2); padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
-                                        📊 Retrieval confidence: {retrieval_confidence}
-                                    </span>
-                                </div>"""
-                            elif rc_source == 'insufficient_evidence':
-                                rc_badge_html = f"""
-                                <div style="margin-bottom:14px;">
-                                    <span style="background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.25); padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
-                                        ⚠️ Insufficient evidence · confidence {retrieval_confidence}
-                                    </span>
-                                </div>"""
-                            else:
-                                rc_badge_html = ""
+                            # Evidence explorer (cleaned chunks)
+                            render_evidence_explorer(hybrid_results.get('merged_results', []))
 
-                            st.markdown(f"""
-                            <div class="rag-card" style="border: 1px solid rgba(168, 85, 247, 0.2); border-radius:12px; padding:20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%); margin-bottom:25px; box-shadow: 0 4px 20px rgba(168, 85, 247, 0.05)">
-                                <div style="font-size:1.15rem; font-weight:600; color:#f8fafc; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
-                                    <span>✨ Synthesized Answer</span>
-                                    <span style="background-color:rgba(168, 85, 247, 0.1); color:#c084fc; border: 1px solid rgba(168, 85, 247, 0.2); padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">RAG Engine</span>
-                                </div>
-                                {rc_badge_html}
-                                <div style="font-family:sans-serif; font-size:0.95rem; color:#e2e8f0; line-height:1.6; white-space:pre-wrap; text-align:left;">{rag_response['answer']}</div>
-                                <div style="margin-top:15px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); font-size:0.8rem; color:#94a3b8;">
-                                    <strong>Consulted Sources:</strong> {", ".join(rag_response['sources'])}
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            # Knowledge Graph relations as chips (cleaned)
+                            if hybrid_results.get('graph_results'):
+                                st.markdown('### 🕸️ Knowledge Graph Relations')
+                                for g in hybrid_results["graph_results"]:
+                                    relation = clean_llm_text(g["relation"])
+                                    entity = clean_llm_text(g["entity"])
+                                    st.markdown(f"- **{relation}** → **{entity}**")
+
+                            # Unified Evidence List title (chunks will be rendered below by existing loop)
+                            st.markdown(f"### 🗃️ Unified Evidence List ({len(hybrid_results['merged_results'])} items found):")
                         except Exception as re:
                             st.error(f"RAG generation failed: {re}")
-
-                        # --- Knowledge Graph Relations ---
-                        if hybrid_results.get('graph_results'):
-                            st.markdown('### 🕸️ Knowledge Graph Relations')
-                            graph_html = '<div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:25px;">'
-                            for g in hybrid_results['graph_results']:
-                                relation = g['relation']
-                                entity   = g['entity']
-                                graph_html += f"""
-                                <span style="background-color:rgba(59, 130, 246, 0.1); color:#60a5fa; border: 1px solid rgba(59, 130, 246, 0.2); padding:6px 14px; border-radius:20px; font-size:0.85rem; font-weight:600;">
-                                    ⛓️ {relation} ➔ <span style="color:#f8fafc;">{entity}</span>
-                                </span>
-                                """
-                            graph_html += '</div>'
-                            st.markdown(graph_html, unsafe_allow_html=True)
-
-                        # --- Unified Evidence List ---
-                        st.markdown(f"### 🗃️ Unified Evidence List ({len(hybrid_results['merged_results'])} items found):")
+                        
+                        # Removed stray HTML block and duplicate evidence list block
 
                         for i, r in enumerate(hybrid_results['merged_results']):
                             r_type = r['retrieval_type']
                             source = r['metadata'].get('source', 'Unknown')
                             page   = r['metadata'].get('page', 'Unknown')
                             assets = r['metadata'].get('asset_ids', 'None')
-                            text   = r['text']
+                            text   = clean_llm_text(r['text'])
 
                             if r_type == 'semantic':
                                 badge_text   = "Semantic Match"
@@ -364,6 +350,9 @@ with tab2:
                             elif source == "knowledge_graph":
                                 source_color = "#a78bfa"
 
+                            from html import escape as html_escape
+                            safe_text = html_escape(text)
+
                             st.markdown(f"""
                             <div class="result-card" style="border: 1px solid {border_color}; border-radius:12px; padding:20px; background-color:#0f172a; margin-bottom:15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1)">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
@@ -377,8 +366,8 @@ with tab2:
                                     {"<div><strong>Page:</strong> <span style='color:#cbd5e1;'>" + str(page) + "</span></div>" if r_type != "graph" else ""}
                                     {"<div><strong>Assets:</strong> <span style='color:#cbd5e1; font-weight:600;'>" + str(assets) + "</span></div>" if r_type != "graph" else ""}
                                 </div>
-                                <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.04); border-radius:6px; padding:12px; font-family:sans-serif; font-size:0.92rem; color:#cbd5e1; line-height:1.5; text-align:left;">
-                                    {text}
+                                <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.04); border-radius:6px; padding:12px; font-size:0.92rem; color:#cbd5e1; line-height:1.6; white-space:pre-wrap;">
+                                    {safe_text}
                                 </div>
                             </div>
                             """, unsafe_allow_html=True)
