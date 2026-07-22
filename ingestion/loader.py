@@ -79,3 +79,21 @@ def load_document(file_path: str) -> dict:
         doc_obj['pages'] = pages_data
         
     return doc_obj
+
+def load_documents(folder_path: str) -> list:
+    """Loads all supported documents from a directory."""
+    docs = []
+    if not os.path.exists(folder_path):
+        return docs
+    for filename in sorted(os.listdir(folder_path)):
+        file_path = os.path.join(folder_path, filename)
+        if os.path.isfile(file_path):
+            _, ext = os.path.splitext(filename)
+            if ext.lower() in SUPPORTED_EXTENSIONS:
+                try:
+                    doc = load_document(file_path)
+                    docs.append(doc)
+                except Exception as e:
+                    print(f"Failed to load {filename}: {e}")
+    return docs
+

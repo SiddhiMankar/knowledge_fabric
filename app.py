@@ -233,26 +233,73 @@ with tab2:
         if query.strip():
             with st.spinner("Searching vector database..."):
                 try:
-                    results = search(query, top_k=top_k)
-                    
-                    if results and 'documents' in results and results['documents'] and len(results['documents'][0]) > 0:
-                        docs = results['documents'][0]
-                        ids = results['ids'][0] if 'ids' in results else []
-                        metadatas = results['metadatas'][0] if 'metadatas' in results else []
-                        distances = results['distances'][0] if 'distances' in results else []
-                        
-                        # Generate RAG answer
+                    # Load all chunks for keyword search
+                    import json
+                    all_chunks = []
+                    chunks_file = 'data/processed/chunks.json'
+                    if os.path.exists(chunks_file):
+                        with open(chunks_file, 'r', encoding='utf-8') as f:
+                            try:
+                                all_chunks = json.load(f)
+                            except Exception:
+                                pass
+
+                    from retrieval.hybrid import hybrid_retrieve
+                    # Evidence-governed hybrid retrieval
+                    hybrid_results = hybrid_retrieve(query, all_chunks, top_k=top_k)
+                    trace = hybrid_results.get('trace', {})
+                    retrieval_confidence = trace.get('retrieval_confidence', 0.0)
+
+                    # Convert boosted/filtered vector results to format expected by generate_answer
+                    boosted_docs = [r['text'] for r in hybrid_results['vector_results']]
+                    boosted_metas = [r['metadata'] for r in hybrid_results['vector_results']]
+                    boosted_results = {
+                        'documents': [boosted_docs],
+                        'metadatas': [boosted_metas]
+                    }
+
+                    if boosted_docs or hybrid_results.get('keyword_results'):
+                        # --- RAG Answer ---
                         st.markdown('<div class="section-title">🤖 AI Assistant Response</div>', unsafe_allow_html=True)
                         try:
                             from retrieval.rag import generate_answer
-                            rag_response = generate_answer(query, results)
-                            
+                            rag_response = generate_answer(query, boosted_results, confidence=retrieval_confidence)
+
+                            # Root cause source badge
+                            rc_source = rag_response.get('root_cause_source')
+                            rc_conf   = rag_response.get('root_cause_confidence')
+                            rc_name   = rag_response.get('root_cause')
+
+                            if rc_source == 'knowledge_graph' and rc_name:
+                                rc_badge_html = f"""
+                                <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px; flex-wrap:wrap;">
+                                    <span style="background:rgba(59,130,246,0.12); color:#60a5fa; border:1px solid rgba(59,130,246,0.3); padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
+                                        🕸️ Root cause source: Knowledge Graph
+                                    </span>
+                                    <span style="background:rgba(52,211,153,0.1); color:#34d399; border:1px solid rgba(52,211,153,0.25); padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
+                                        ✅ {rc_name} &nbsp;·&nbsp; confidence {rc_conf}
+                                    </span>
+                                    <span style="background:rgba(168,85,247,0.1); color:#c084fc; border:1px solid rgba(168,85,247,0.2); padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
+                                        📊 Retrieval confidence: {retrieval_confidence}
+                                    </span>
+                                </div>"""
+                            elif rc_source == 'insufficient_evidence':
+                                rc_badge_html = f"""
+                                <div style="margin-bottom:14px;">
+                                    <span style="background:rgba(239,68,68,0.1); color:#f87171; border:1px solid rgba(239,68,68,0.25); padding:4px 12px; border-radius:20px; font-size:0.8rem; font-weight:700;">
+                                        ⚠️ Insufficient evidence · confidence {retrieval_confidence}
+                                    </span>
+                                </div>"""
+                            else:
+                                rc_badge_html = ""
+
                             st.markdown(f"""
                             <div class="rag-card" style="border: 1px solid rgba(168, 85, 247, 0.2); border-radius:12px; padding:20px; background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%); margin-bottom:25px; box-shadow: 0 4px 20px rgba(168, 85, 247, 0.05)">
                                 <div style="font-size:1.15rem; font-weight:600; color:#f8fafc; margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
                                     <span>✨ Synthesized Answer</span>
                                     <span style="background-color:rgba(168, 85, 247, 0.1); color:#c084fc; border: 1px solid rgba(168, 85, 247, 0.2); padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">RAG Engine</span>
                                 </div>
+                                {rc_badge_html}
                                 <div style="font-family:sans-serif; font-size:0.95rem; color:#e2e8f0; line-height:1.6; white-space:pre-wrap; text-align:left;">{rag_response['answer']}</div>
                                 <div style="margin-top:15px; padding-top:10px; border-top:1px solid rgba(255,255,255,0.06); font-size:0.8rem; color:#94a3b8;">
                                     <strong>Consulted Sources:</strong> {", ".join(rag_response['sources'])}
@@ -261,49 +308,93 @@ with tab2:
                             """, unsafe_allow_html=True)
                         except Exception as re:
                             st.error(f"RAG generation failed: {re}")
-                            
-                        st.markdown(f"### Found {len(docs)} matching chunks:")
-                        
-                        for i, doc in enumerate(docs):
-                            doc_id = ids[i] if i < len(ids) else f"chunk_{i}"
-                            meta = metadatas[i] if i < len(metadatas) else {}
-                            dist = distances[i] if i < len(distances) else 0.0
-                            
-                            # Convert distance to approximate percentage match
-                            match_score = max(0.0, min(100.0, (2.0 - dist) / 2.0 * 100.0))
-                            
-                            source = meta.get('source', 'Unknown')
-                            page = meta.get('page', 'Unknown')
-                            assets = meta.get('asset_ids', 'None')
-                            
-                            badge_color = "#38bdf8"
+
+                        # --- Knowledge Graph Relations ---
+                        if hybrid_results.get('graph_results'):
+                            st.markdown('### 🕸️ Knowledge Graph Relations')
+                            graph_html = '<div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:25px;">'
+                            for g in hybrid_results['graph_results']:
+                                relation = g['relation']
+                                entity   = g['entity']
+                                graph_html += f"""
+                                <span style="background-color:rgba(59, 130, 246, 0.1); color:#60a5fa; border: 1px solid rgba(59, 130, 246, 0.2); padding:6px 14px; border-radius:20px; font-size:0.85rem; font-weight:600;">
+                                    ⛓️ {relation} ➔ <span style="color:#f8fafc;">{entity}</span>
+                                </span>
+                                """
+                            graph_html += '</div>'
+                            st.markdown(graph_html, unsafe_allow_html=True)
+
+                        # --- Unified Evidence List ---
+                        st.markdown(f"### 🗃️ Unified Evidence List ({len(hybrid_results['merged_results'])} items found):")
+
+                        for i, r in enumerate(hybrid_results['merged_results']):
+                            r_type = r['retrieval_type']
+                            source = r['metadata'].get('source', 'Unknown')
+                            page   = r['metadata'].get('page', 'Unknown')
+                            assets = r['metadata'].get('asset_ids', 'None')
+                            text   = r['text']
+
+                            if r_type == 'semantic':
+                                badge_text   = "Semantic Match"
+                                badge_bg     = "rgba(52, 211, 153, 0.1)"
+                                badge_color  = "#34d399"
+                                border_color = "rgba(52, 211, 153, 0.15)"
+                                score_val    = r.get('score', 0.0)
+                                score_text   = f"{max(0.0, min(100.0, score_val * 100.0)):.1f}% Match"
+                            elif r_type == 'keyword':
+                                badge_text   = "Keyword Match"
+                                badge_bg     = "rgba(245, 158, 11, 0.1)"
+                                badge_color  = "#f59e0b"
+                                border_color = "rgba(245, 158, 11, 0.15)"
+                                score_text   = "Asset Tag Match"
+                            else:
+                                badge_text   = "Graph Relation"
+                                badge_bg     = "rgba(59, 130, 246, 0.1)"
+                                badge_color  = "#3b82f6"
+                                border_color = "rgba(59, 130, 246, 0.15)"
+                                score_text   = "KG Lookup"
+
+                            source_color = "#38bdf8"
                             if source.endswith(".pdf"):
-                                badge_color = "#f87171"
-                            elif source.endswith(".xlsx") or source.endswith(".xls"):
-                                badge_color = "#34d399"
+                                source_color = "#f87171"
+                            elif source.endswith((".xlsx", ".xls")):
+                                source_color = "#34d399"
                             elif source.endswith(".docx"):
-                                badge_color = "#60a5fa"
-                            elif source.endswith(".jpg") or source.endswith(".jpeg") or source.endswith(".png"):
-                                badge_color = "#c084fc"
-                            
+                                source_color = "#60a5fa"
+                            elif source == "knowledge_graph":
+                                source_color = "#a78bfa"
+
                             st.markdown(f"""
-                            <div class="result-card" style="border: 1px solid rgba(255,255,255,0.06); border-radius:12px; padding:20px; background-color:#0f172a; margin-bottom:20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1)">
+                            <div class="result-card" style="border: 1px solid {border_color}; border-radius:12px; padding:20px; background-color:#0f172a; margin-bottom:15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1)">
                                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                                    <div style="font-size:1.1rem; font-weight:600; color:#f8fafc;">
-                                        Result {i+1} <span style="font-size:0.8rem; font-family:monospace; color:#64748b;">({doc_id})</span>
+                                    <div style="font-size:1.05rem; font-weight:600; color:#f8fafc;">
+                                        Evidence {i+1} <span style="background-color:{badge_bg}; color:{badge_color}; border: 1px solid {badge_color}33; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; margin-left:8px; text-transform:uppercase;">{badge_text}</span>
                                     </div>
-                                    <span style="background-color:rgba(52, 211, 153, 0.1); color:#34d399; border: 1px solid rgba(52, 211, 153, 0.2); padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">
-                                        {match_score:.1f}% Match
-                                    </span>
+                                    <span style="font-size:0.8rem; font-weight:600; color:#94a3b8;">{score_text}</span>
                                 </div>
-                                <div style="display:flex; flex-wrap:wrap; gap:10px; gap-row:5px; margin-bottom:12px; font-size:0.85rem; color:#94a3b8;">
-                                    <div><strong>Source:</strong> <span style="color:{badge_color};">{source}</span></div>
-                                    <div><strong>Page:</strong> <span style="color:#cbd5e1;">{page}</span></div>
-                                    <div><strong>Assets:</strong> <span style="color:#cbd5e1; font-weight:600;">{assets}</span></div>
+                                <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; font-size:0.85rem; color:#94a3b8;">
+                                    <div><strong>Source:</strong> <span style="color:{source_color};">{source}</span></div>
+                                    {"<div><strong>Page:</strong> <span style='color:#cbd5e1;'>" + str(page) + "</span></div>" if r_type != "graph" else ""}
+                                    {"<div><strong>Assets:</strong> <span style='color:#cbd5e1; font-weight:600;'>" + str(assets) + "</span></div>" if r_type != "graph" else ""}
                                 </div>
-                                <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.04); border-radius:6px; padding:12px; font-family:sans-serif; font-size:0.92rem; color:#cbd5e1; line-height:1.5;">
-                                    {doc}
+                                <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.04); border-radius:6px; padding:12px; font-family:sans-serif; font-size:0.92rem; color:#cbd5e1; line-height:1.5; text-align:left;">
+                                    {text}
                                 </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                        # --- Retrieval Trace Expander ---
+                        with st.expander("🔍 Evidence Selection Trace", expanded=False):
+                            t = hybrid_results.get('trace', {})
+                            st.markdown(f"""
+                            <div style="font-family:monospace; font-size:0.88rem; color:#94a3b8; line-height:2;">
+                                <div>📌 <strong>Query assets:</strong> <span style="color:#60a5fa;">{', '.join(t.get('query_assets', [])) or 'None (generic query)'}</span></div>
+                                <div>📦 <strong>Vector candidates:</strong> {t.get('vector_candidates', 0)}</div>
+                                <div>🚫 <strong>Filtered out (asset mismatch):</strong> {t.get('filtered_out_asset_mismatch', 0)}</div>
+                                <div>🕸️ <strong>KG relations used:</strong> {t.get('kg_relations_used', 0)}</div>
+                                <div>📊 <strong>Doc-type quotas applied:</strong> {t.get('evidence_quotas_applied', {})}</div>
+                                <div>📁 <strong>Final evidence sources:</strong> <span style="color:#34d399;">{', '.join(t.get('final_evidence', [])) or 'None'}</span></div>
+                                <div>🎯 <strong>Retrieval confidence:</strong> <span style="color:{'#34d399' if t.get('retrieval_confidence',0) >= 0.5 else '#f87171'}; font-weight:bold;">{t.get('retrieval_confidence', 0.0)}</span></div>
                             </div>
                             """, unsafe_allow_html=True)
                     else:

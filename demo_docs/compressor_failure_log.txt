@@ -1,0 +1,16 @@
+ASSET: C-201
+TYPE: Centrifugal Compressor
+LOCATION: Process Unit 2, Bay C
+
+FAILURE LOG — C-201
+
+2026-01-08 06:45 C-201 discharge pressure dropped to 4.2 bar (normal: 7.5 bar).
+2026-01-08 07:30 Inspection found heavy fouling on impeller blades. Unit taken offline.
+2026-01-08 09:15 Impeller cleaned chemically. Compressor returned to service.
+2026-02-14 11:00 C-201 motor current draw increased to 48A (normal: 38A).
+2026-02-14 13:20 Impeller fouling suspected. Partial shutdown for inspection.
+2026-02-14 15:00 Fouling confirmed. Deposits consistent with process fluid carryover.
+2026-03-05 08:30 Discharge pressure dropped again to 4.8 bar. Vibration at 5.2 mm/s RMS.
+2026-03-05 10:00 Impeller re-fouled. Root cause: upstream knockout drum not draining properly, allowing liquid carryover into C-201 suction.
+2026-04-10 07:00 Inlet temperature spike to 85°C. Valve-7 suction valve found partially obstructed.
+2026-04-10 09:00 Valve-7 cleaned and reinstated. C-201 returned to service at normal operating parameters.

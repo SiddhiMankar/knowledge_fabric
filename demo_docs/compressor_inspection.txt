@@ -1,0 +1,40 @@
+ASSET: C-201
+TYPE: Centrifugal Compressor
+INSPECTION DATE: 2026-04-15
+INSPECTOR: J. Patel
+
+COMPRESSOR C-201 — INSPECTION REPORT
+
+1. OVERVIEW
+Inspection conducted following repeated impeller fouling events between January and April 2026.
+Total unplanned downtime attributed to C-201 fouling: 34 hours over 4 months.
+
+2. IMPELLER CONDITION
+Impeller found with heavy deposits on blade leading edges. Deposit composition: process fluid residue
+and particulate matter. Blade erosion estimated at 8% of original thickness at trailing edges.
+Efficiency loss estimated at 12% compared to baseline commissioning data.
+
+3. SUCTION VALVE — VALVE-7
+Valve-7 found with partial obstruction caused by accumulated particulate buildup.
+Flow restriction estimated at 20% of rated capacity. Valve internals worn; recommend replacement
+at next planned shutdown (target: Q3 2026).
+
+4. UPSTREAM KNOCKOUT DRUM
+Root cause investigation confirmed that the upstream knockout drum (KD-04) drain valve
+(XV-12) was operating with sluggish actuation, allowing liquid carryover into C-201 suction.
+Recommendation: replace XV-12 actuator. Priority: HIGH.
+
+5. MOTOR AND BEARINGS
+Motor winding insulation resistance: 420 MΩ (acceptable, >100 MΩ).
+Bearing temperatures during steady-state operation: Drive-end 58°C, Non-drive-end 54°C (normal).
+Vibration at 3.1 mm/s RMS (within acceptable limit of 7.1 mm/s).
+
+6. RECOMMENDATIONS
+- Replace XV-12 actuator on KD-04 knockout drum: HIGH priority
+- Schedule Valve-7 replacement: Q3 2026
+- Install inline suction strainer upstream of C-201: MEDIUM priority
+- Increase impeller cleaning frequency from quarterly to bi-monthly until root cause resolved
+
+7. RETURN TO SERVICE
+C-201 cleared for return to service following impeller cleaning and Valve-7 restoration.
+Post-maintenance vibration: 3.1 mm/s RMS. Discharge pressure: 7.4 bar. Motor current: 39A.

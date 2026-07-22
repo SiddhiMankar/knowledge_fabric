@@ -1,0 +1,16 @@
+ASSET: B-301
+TYPE: Industrial Centrifugal Blower
+LOCATION: Utility Block 3, Section B
+
+FAILURE LOG — B-301
+
+2026-01-20 09:10 B-301 airflow reduced. Outlet pressure dropped to 1.1 bar (normal: 1.8 bar).
+2026-01-20 10:00 Inspection revealed drive belt slippage. Belt tension measured at 4.2 N/mm (minimum: 6.0 N/mm).
+2026-01-20 11:30 Belt tensioned. B-301 returned to service.
+2026-02-22 14:15 B-301 tripped on high vibration. Vibration measured at 9.1 mm/s RMS (trip setpoint: 9.0 mm/s).
+2026-02-22 15:00 Filter-12 suction filter found 85% blocked with particulate. Differential pressure across filter: 0.6 bar (alarm: 0.3 bar).
+2026-02-22 16:00 Filter-12 replaced. Belt re-tensioned. B-301 returned to service at 1.7 bar outlet pressure.
+2026-03-30 08:00 Recurrence of belt slippage. Maintenance review determined belt is at end of service life.
+2026-03-30 09:45 Drive belt replaced (new belt, rated 10,000 hours). Motor current post-replacement: 22A (normal: 20-24A).
+2026-04-18 07:30 Vibration trending upward: 5.8 mm/s RMS. Suction filter showing elevated differential pressure (0.28 bar).
+2026-04-18 08:00 Filter-12 cleaned. Differential pressure restored to 0.09 bar. Vibration reduced to 3.2 mm/s RMS.

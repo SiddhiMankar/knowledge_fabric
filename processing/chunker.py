@@ -18,12 +18,8 @@ def chunk_document(document: dict) -> list:
     source = document['source']
     doc_type = document['metadata']['type']
     
-    # Generate base name for chunk ID: lowercase, spaces replaced with underscores, extensions stripped
-    base_name = source
-    extensions_to_strip = ['.pdf', '.png', '.jpg', '.jpeg', '.bmp', '.tif', '.tiff', '.xlsx', '.xls', '.txt', '.docx']
-    for ext in extensions_to_strip:
-        base_name = base_name.replace(ext, '').replace(ext.upper(), '')
-    base_name = base_name.lower().replace(' ', '_')
+    # Generate base name for chunk ID: lowercase, dots and spaces replaced with underscores
+    base_name = source.lower().replace('.', '_').replace(' ', '_')
     
     chunks = []
     
@@ -116,3 +112,27 @@ def save_chunks(new_chunks: list, output_path: str = 'data/processed/chunks.json
         
     return combined_chunks
 
+
+if __name__ == '__main__':
+    import os
+    from ingestion.loader import load_documents
+
+    print('Loading documents from demo_docs/...')
+
+    docs = load_documents('demo_docs')
+
+    print(f'Loaded {len(docs)} documents')
+
+    all_chunks = []
+
+    for doc in docs:
+        chunks = chunk_document(doc)
+        all_chunks.extend(chunks)
+
+    output_path = 'data/processed/chunks.json'
+
+    print(f'Saving {len(all_chunks)} chunks to {output_path}')
+
+    save_chunks(all_chunks, output_path)
+
+    print('Chunk generation complete')
