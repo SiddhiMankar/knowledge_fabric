@@ -6,15 +6,34 @@ import docx
 
 os.makedirs("demo_docs", exist_ok=True)
 
-# 1. pump_manual.pdf
-print("Generating pump_manual.pdf...")
+# 1. pump_manual.pdf (contains a long description to trigger multiple chunks)
+print("Generating pump_manual.pdf with long content...")
 doc = fitz.open()
-page = doc.new_page()
-# Let's insert content to test text extraction and page counting
-page.insert_text((50, 50), "Centrifugal pump P-101 is designed for continuous operation. Seal leakage may occur if flushing pressure drops below 2 bar...")
-page.insert_text((50, 200), "This is page 1 content.")
+
+# Page 1 - Large page to hold 800 words
+page = doc.new_page(width=1000, height=2000)
+
+# Generate a list of words of length 800 containing scattered asset IDs
+words = []
+for i in range(800):
+    if i == 100:
+        words.append("P-101")
+    elif i == 400:
+        words.append("V-200")
+    elif i == 700:
+        words.append("B-3")
+    else:
+        words.append(f"parameter_{i}")
+long_description = " ".join(words)
+
+# Insert the long description using a textbox that handles wrapping
+rect = fitz.Rect(10, 10, 990, 1990)
+page.insert_textbox(rect, "Centrifugal pump P-101 is designed for continuous operation. Detailed parameters:\n" + long_description)
+
+# Page 2
 page2 = doc.new_page()
-page2.insert_text((50, 50), "This is page 2 content. Maintenance should be done every 6 months.")
+page2.insert_text((50, 50), "This is page 2 content. Maintenance of V-101 and C-12 should be done every 6 months.")
+
 doc.save("demo_docs/pump_manual.pdf")
 doc.close()
 

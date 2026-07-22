@@ -1,10 +1,11 @@
 import os
 import streamlit as st
 from ingestion.loader import load_document
+from processing.chunker import chunk_document, save_chunks
 
 # Set page configuration with a premium title and layout
 st.set_page_config(
-    page_title="Knowledge Fabric - Ingestion Pipeline",
+    page_title="Knowledge Fabric - Ingestion & Chunking Pipeline",
     page_icon="⚙️",
     layout="centered",
     initial_sidebar_state="expanded"
@@ -70,7 +71,7 @@ os.makedirs("data/processed", exist_ok=True)
 st.markdown("""
 <div class="title-card">
     <h1>Knowledge Fabric</h1>
-    <p>Phase 1 — Multiformat Document Ingestion Pipeline</p>
+    <p>Phase 2 — Chunking & Metadata Pipeline</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -98,7 +99,11 @@ if os.path.exists(demo_dir):
         with col2:
             if st.sidebar.button("Clear All", use_container_width=True):
                 st.session_state.dev_loaded_files = []
-                st.sidebar.info("Cleared dev cache.")
+                # Clear chunks file
+                chunks_file = 'data/processed/chunks.json'
+                if os.path.exists(chunks_file):
+                    os.remove(chunks_file)
+                st.sidebar.info("Cleared dev cache & chunks.json.")
 else:
     st.sidebar.error("demo_docs/ directory not found.")
 
@@ -134,10 +139,21 @@ if files_to_process:
             # Process using router
             doc = load_document(file_path)
             
+            # Generate retrieval-ready chunks
+            chunks = chunk_document(doc)
+            
+            # Save chunks to persistent data/processed/chunks.json database
+            cumulative_chunks = save_chunks(chunks)
+            total_cumulative_count = len(cumulative_chunks)
+            
             # Extract attributes
             doc_type = doc['metadata']['type']
             char_count = len(doc['text'])
-            preview_text = doc['text'][:1000]
+            
+            num_chunks = len(chunks)
+            first_chunk_id = chunks[0]['chunk_id'] if chunks else "N/A"
+            first_chunk_assets = ", ".join(chunks[0]['metadata']['asset_ids']) if chunks and chunks[0]['metadata']['asset_ids'] else "None"
+            first_chunk_text = chunks[0]['text'][:800] if chunks else ""
             
             # Format badge color dynamically
             badge_color = "#94a3b8"
@@ -159,6 +175,10 @@ if files_to_process:
             if "sheets" in doc['metadata']:
                 meta_html += f"<div><strong>Sheets:</strong> {doc['metadata']['sheets']}</div>"
             meta_html += f"<div><strong>Characters:</strong> {char_count:,}</div>"
+            meta_html += f"<div><strong>Chunks:</strong> {num_chunks}</div>"
+            meta_html += f"<div><strong>First Chunk ID:</strong> <span style='font-family:monospace; color:#cbd5e1;'>{first_chunk_id}</span></div>"
+            meta_html += f"<div><strong>Assets:</strong> <span style='color:#e2e8f0; font-weight:600;'>{first_chunk_assets}</span></div>"
+            meta_html += f"<div><strong>Total Cumulative Chunks:</strong> {total_cumulative_count}</div>"
             
             # Beautiful card presentation
             st.markdown(f"""
@@ -167,15 +187,17 @@ if files_to_process:
                     <span>🟢 {doc['source']} processed successfully</span>
                     <span style="background-color:rgba(255,255,255,0.05); padding:2px 8px; border-radius:4px; font-size:0.75rem; text-transform:uppercase; font-weight:bold; color:{badge_color}; border: 1px solid {badge_color}33;">{doc_type}</span>
                 </div>
-                <div style="display:flex; gap:20px; margin-bottom:15px; font-size:0.95rem; color:#94a3b8">
+                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-bottom:15px; font-size:0.95rem; color:#94a3b8">
                     {meta_html}
                 </div>
-                <div style="font-size:0.75rem; color:#64748b; text-transform:uppercase; font-weight:700; margin-bottom:5px">Extracted Text Preview</div>
-                <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.05); border-radius:6px; padding:12px; font-family:monospace; white-space:pre-wrap; max-height:250px; overflow-y:auto; font-size:0.85rem; color:#cbd5e1; text-align:left">{preview_text}</div>
+                <div style="font-size:0.75rem; color:#64748b; text-transform:uppercase; font-weight:700; margin-bottom:5px">First Chunk Text Preview ({first_chunk_id})</div>
+                <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.05); border-radius:6px; padding:12px; font-family:monospace; white-space:pre-wrap; max-height:250px; overflow-y:auto; font-size:0.85rem; color:#cbd5e1; text-align:left">{first_chunk_text}</div>
             </div>
             """, unsafe_allow_html=True)
             
         except Exception as e:
             st.error(f"Failed to process {os.path.basename(file_path)}: {str(e)}")
+            import traceback
+            st.sidebar.code(traceback.format_exc())
 else:
     st.info("Upload documents or use the Developer Test Panel to load sample documents.")

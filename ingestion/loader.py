@@ -32,6 +32,7 @@ def load_document(file_path: str) -> dict:
         
     doc_type = SUPPORTED_EXTENSIONS[ext_lower]
     
+    pages_data = None
     if doc_type == 'pdf':
         res = load_pdf(file_path)
         metadata = {
@@ -39,6 +40,7 @@ def load_document(file_path: str) -> dict:
             'pages': res['pages']
         }
         text = res['text']
+        pages_data = res['pages_data']
     elif doc_type == 'image':
         res = load_image(file_path)
         metadata = {
@@ -67,9 +69,13 @@ def load_document(file_path: str) -> dict:
     else:
         raise ValueError(f"Unknown type mapping for extension: {ext}")
         
-    return {
+    doc_obj = {
         'doc_id': doc_id,
         'source': filename,
         'text': text,
         'metadata': metadata
     }
+    if pages_data is not None:
+        doc_obj['pages'] = pages_data
+        
+    return doc_obj
