@@ -353,24 +353,25 @@ with tab2:
                             from html import escape as html_escape
                             safe_text = html_escape(text)
 
-                            st.markdown(f"""
-                            <div class="result-card" style="border: 1px solid {border_color}; border-radius:12px; padding:20px; background-color:#0f172a; margin-bottom:15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1)">
-                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                                    <div style="font-size:1.05rem; font-weight:600; color:#f8fafc;">
-                                        Evidence {i+1} <span style="background-color:{badge_bg}; color:{badge_color}; border: 1px solid {badge_color}33; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; margin-left:8px; text-transform:uppercase;">{badge_text}</span>
-                                    </div>
-                                    <span style="font-size:0.8rem; font-weight:600; color:#94a3b8;">{score_text}</span>
-                                </div>
-                                <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; font-size:0.85rem; color:#94a3b8;">
-                                    <div><strong>Source:</strong> <span style="color:{source_color};">{source}</span></div>
-                                    {"<div><strong>Page:</strong> <span style='color:#cbd5e1;'>" + str(page) + "</span></div>" if r_type != "graph" else ""}
-                                    {"<div><strong>Assets:</strong> <span style='color:#cbd5e1; font-weight:600;'>" + str(assets) + "</span></div>" if r_type != "graph" else ""}
-                                </div>
-                                <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.04); border-radius:6px; padding:12px; font-size:0.92rem; color:#cbd5e1; line-height:1.6; white-space:pre-wrap;">
-                                    {safe_text}
-                                </div>
-                            </div>
-                            """, unsafe_allow_html=True)
+                            meta_items = [f'<div><strong>Source:</strong> <span style="color:{source_color};">{html_escape(str(source))}</span></div>']
+                            if r_type != "graph":
+                                meta_items.append(f'<div><strong>Page:</strong> <span style="color:#cbd5e1;">{html_escape(str(page))}</span></div>')
+                                meta_items.append(f'<div><strong>Assets:</strong> <span style="color:#cbd5e1; font-weight:600;">{html_escape(str(assets))}</span></div>')
+                            meta_row_html = "".join(meta_items)
+
+                            card_html = f'''<div class="result-card" style="border: 1px solid {border_color}; border-radius:12px; padding:20px; background-color:#0f172a; margin-bottom:15px; box-shadow: 0 4px 15px rgba(0,0,0,0.1)">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+        <div style="font-size:1.05rem; font-weight:600; color:#f8fafc;">
+            Evidence {i+1} <span style="background-color:{badge_bg}; color:{badge_color}; border: 1px solid {badge_color}33; padding:2px 8px; border-radius:4px; font-size:0.7rem; font-weight:bold; margin-left:8px; text-transform:uppercase;">{badge_text}</span>
+        </div>
+        <span style="font-size:0.8rem; font-weight:600; color:#94a3b8;">{score_text}</span>
+    </div>
+    <div style="display:flex; flex-wrap:wrap; gap:12px; margin-bottom:12px; font-size:0.85rem; color:#94a3b8;">
+        {meta_row_html}
+    </div>
+    <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.04); border-radius:6px; padding:12px; font-size:0.92rem; color:#cbd5e1; line-height:1.6; white-space:pre-wrap;">{safe_text}</div>
+</div>'''
+                            st.markdown(card_html, unsafe_allow_html=True)
 
                         # --- Retrieval Trace Expander ---
                         with st.expander("🔍 Evidence Selection Trace", expanded=False):
