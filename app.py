@@ -2,10 +2,11 @@ import os
 import streamlit as st
 from ingestion.loader import load_document
 from processing.chunker import chunk_document, save_chunks
+from retrieval.vector_store import search, index_chunks
 
 # Set page configuration with a premium title and layout
 st.set_page_config(
-    page_title="Knowledge Fabric - Ingestion & Chunking Pipeline",
+    page_title="Knowledge Fabric - Knowledge Platform",
     page_icon="⚙️",
     layout="centered",
     initial_sidebar_state="expanded"
@@ -71,7 +72,7 @@ os.makedirs("data/processed", exist_ok=True)
 st.markdown("""
 <div class="title-card">
     <h1>Knowledge Fabric</h1>
-    <p>Phase 2 — Chunking & Metadata Pipeline</p>
+    <p>Multi-Format Ingestion & Semantic Search Platform</p>
 </div>
 """, unsafe_allow_html=True)
 
@@ -107,97 +108,190 @@ if os.path.exists(demo_dir):
 else:
     st.sidebar.error("demo_docs/ directory not found.")
 
-# Uploader Section
-st.markdown('<div class="section-title">📂 Document Ingestion</div>', unsafe_allow_html=True)
-uploaded_files = st.file_uploader(
-    "Upload files (PDF, images, Excel, TXT, DOCX)",
-    type=["pdf", "png", "jpg", "jpeg", "bmp", "tif", "xlsx", "xls", "txt", "docx"],
-    accept_multiple_files=True
-)
+# Create tabs for Ingestion and Search
+tab1, tab2 = st.tabs(["📂 Document Ingestion & Chunking", "🔍 Semantic Search Engine"])
 
-# Collect all files to process (both uploaded and developer loaded)
-files_to_process = []
-
-# Process uploaded files
-if uploaded_files:
-    for uploaded_file in uploaded_files:
-        raw_path = os.path.join("data/raw", uploaded_file.name)
-        with open(raw_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        files_to_process.append(raw_path)
-
-# Process developer loaded files
-for dev_file in st.session_state.dev_loaded_files:
-    if os.path.exists(dev_file) and dev_file not in files_to_process:
-        files_to_process.append(dev_file)
-
-if files_to_process:
-    st.markdown('<div class="section-title">⚙️ Processing Logs</div>', unsafe_allow_html=True)
+with tab1:
+    # Uploader Section
+    st.markdown('<div class="section-title">📂 Document Ingestion</div>', unsafe_allow_html=True)
+    uploaded_files = st.file_uploader(
+        "Upload files (PDF, images, Excel, TXT, DOCX)",
+        type=["pdf", "png", "jpg", "jpeg", "bmp", "tif", "xlsx", "xls", "txt", "docx"],
+        accept_multiple_files=True
+    )
     
-    for file_path in files_to_process:
-        try:
-            # Process using router
-            doc = load_document(file_path)
+    # Collect all files to process (both uploaded and developer loaded)
+    files_to_process = []
+    
+    # Process uploaded files
+    if uploaded_files:
+        for uploaded_file in uploaded_files:
+            raw_path = os.path.join("data/raw", uploaded_file.name)
+            with open(raw_path, "wb") as f:
+                f.write(uploaded_file.getbuffer())
+            files_to_process.append(raw_path)
             
-            # Generate retrieval-ready chunks
-            chunks = chunk_document(doc)
+    # Process developer loaded files
+    for dev_file in st.session_state.dev_loaded_files:
+        if os.path.exists(dev_file) and dev_file not in files_to_process:
+            files_to_process.append(dev_file)
             
-            # Save chunks to persistent data/processed/chunks.json database
-            cumulative_chunks = save_chunks(chunks)
-            total_cumulative_count = len(cumulative_chunks)
-            
-            # Extract attributes
-            doc_type = doc['metadata']['type']
-            char_count = len(doc['text'])
-            
-            num_chunks = len(chunks)
-            first_chunk_id = chunks[0]['chunk_id'] if chunks else "N/A"
-            first_chunk_assets = ", ".join(chunks[0]['metadata']['asset_ids']) if chunks and chunks[0]['metadata']['asset_ids'] else "None"
-            first_chunk_text = chunks[0]['text'][:800] if chunks else ""
-            
-            # Format badge color dynamically
-            badge_color = "#94a3b8"
-            if doc_type == "pdf":
-                badge_color = "#f87171"
-            elif doc_type == "image":
-                badge_color = "#c084fc"
-            elif doc_type == "excel":
-                badge_color = "#34d399"
-            elif doc_type == "docx":
-                badge_color = "#60a5fa"
-            elif doc_type == "txt":
-                badge_color = "#38bdf8"
+    if files_to_process:
+        st.markdown('<div class="section-title">⚙️ Processing Logs</div>', unsafe_allow_html=True)
+        
+        for file_path in files_to_process:
+            try:
+                # Process using router
+                doc = load_document(file_path)
                 
-            # Build metadata strings for standard textual presentation
-            meta_html = f"<div><strong>Type:</strong> <span style='color:{badge_color}'>{doc_type}</span></div>"
-            if "pages" in doc['metadata']:
-                meta_html += f"<div><strong>Pages:</strong> {doc['metadata']['pages']}</div>"
-            if "sheets" in doc['metadata']:
-                meta_html += f"<div><strong>Sheets:</strong> {doc['metadata']['sheets']}</div>"
-            meta_html += f"<div><strong>Characters:</strong> {char_count:,}</div>"
-            meta_html += f"<div><strong>Chunks:</strong> {num_chunks}</div>"
-            meta_html += f"<div><strong>First Chunk ID:</strong> <span style='font-family:monospace; color:#cbd5e1;'>{first_chunk_id}</span></div>"
-            meta_html += f"<div><strong>Assets:</strong> <span style='color:#e2e8f0; font-weight:600;'>{first_chunk_assets}</span></div>"
-            meta_html += f"<div><strong>Total Cumulative Chunks:</strong> {total_cumulative_count}</div>"
-            
-            # Beautiful card presentation
-            st.markdown(f"""
-            <div class="doc-card-container" style="border: 1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px; background-color:#0f172a; margin-bottom:20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15)">
-                <div style="font-size:1.25rem; font-weight:600; margin-bottom:10px; color:#f8fafc; display:flex; justify-content:space-between; align-items:center;">
-                    <span>🟢 {doc['source']} processed successfully</span>
-                    <span style="background-color:rgba(255,255,255,0.05); padding:2px 8px; border-radius:4px; font-size:0.75rem; text-transform:uppercase; font-weight:bold; color:{badge_color}; border: 1px solid {badge_color}33;">{doc_type}</span>
+                # Generate retrieval-ready chunks (triggers auto-indexing in save_chunks)
+                chunks = chunk_document(doc)
+                
+                # Save chunks to database
+                cumulative_chunks = save_chunks(chunks)
+                total_cumulative_count = len(cumulative_chunks)
+                
+                # Extract attributes
+                doc_type = doc['metadata']['type']
+                char_count = len(doc['text'])
+                
+                num_chunks = len(chunks)
+                first_chunk_id = chunks[0]['chunk_id'] if chunks else "N/A"
+                first_chunk_assets = ", ".join(chunks[0]['metadata']['asset_ids']) if chunks and chunks[0]['metadata']['asset_ids'] else "None"
+                first_chunk_text = chunks[0]['text'][:800] if chunks else ""
+                
+                # Format badge color dynamically
+                badge_color = "#94a3b8"
+                if doc_type == "pdf":
+                    badge_color = "#f87171"
+                elif doc_type == "image":
+                    badge_color = "#c084fc"
+                elif doc_type == "excel":
+                    badge_color = "#34d399"
+                elif doc_type == "docx":
+                    badge_color = "#60a5fa"
+                elif doc_type == "txt":
+                    badge_color = "#38bdf8"
+                    
+                # Build metadata strings for standard textual presentation
+                meta_html = f"<div><strong>Type:</strong> <span style='color:{badge_color}'>{doc_type}</span></div>"
+                if "pages" in doc['metadata']:
+                    meta_html += f"<div><strong>Pages:</strong> {doc['metadata']['pages']}</div>"
+                if "sheets" in doc['metadata']:
+                    meta_html += f"<div><strong>Sheets:</strong> {doc['metadata']['sheets']}</div>"
+                meta_html += f"<div><strong>Characters:</strong> {char_count:,}</div>"
+                meta_html += f"<div><strong>Chunks:</strong> {num_chunks}</div>"
+                meta_html += f"<div><strong>First Chunk ID:</strong> <span style='font-family:monospace; color:#cbd5e1;'>{first_chunk_id}</span></div>"
+                meta_html += f"<div><strong>Assets:</strong> <span style='color:#e2e8f0; font-weight:600;'>{first_chunk_assets}</span></div>"
+                meta_html += f"<div><strong>Total Cumulative Chunks:</strong> {total_cumulative_count}</div>"
+                
+                # Beautiful card presentation
+                st.markdown(f"""
+                <div class="doc-card-container" style="border: 1px solid rgba(255,255,255,0.08); border-radius:12px; padding:20px; background-color:#0f172a; margin-bottom:20px; box-shadow: 0 4px 20px rgba(0,0,0,0.15)">
+                    <div style="font-size:1.25rem; font-weight:600; margin-bottom:10px; color:#f8fafc; display:flex; justify-content:space-between; align-items:center;">
+                        <span>🟢 {doc['source']} processed successfully</span>
+                        <span style="background-color:rgba(255,255,255,0.05); padding:2px 8px; border-radius:4px; font-size:0.75rem; text-transform:uppercase; font-weight:bold; color:{badge_color}; border: 1px solid {badge_color}33;">{doc_type}</span>
+                    </div>
+                    <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-bottom:15px; font-size:0.95rem; color:#94a3b8">
+                        {meta_html}
+                    </div>
+                    <div style="font-size:0.75rem; color:#64748b; text-transform:uppercase; font-weight:700; margin-bottom:5px">First Chunk Text Preview ({first_chunk_id})</div>
+                    <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.05); border-radius:6px; padding:12px; font-family:monospace; white-space:pre-wrap; max-height:250px; overflow-y:auto; font-size:0.85rem; color:#cbd5e1; text-align:left">{first_chunk_text}</div>
                 </div>
-                <div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:10px; margin-bottom:15px; font-size:0.95rem; color:#94a3b8">
-                    {meta_html}
-                </div>
-                <div style="font-size:0.75rem; color:#64748b; text-transform:uppercase; font-weight:700; margin-bottom:5px">First Chunk Text Preview ({first_chunk_id})</div>
-                <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.05); border-radius:6px; padding:12px; font-family:monospace; white-space:pre-wrap; max-height:250px; overflow-y:auto; font-size:0.85rem; color:#cbd5e1; text-align:left">{first_chunk_text}</div>
-            </div>
-            """, unsafe_allow_html=True)
-            
-        except Exception as e:
-            st.error(f"Failed to process {os.path.basename(file_path)}: {str(e)}")
-            import traceback
-            st.sidebar.code(traceback.format_exc())
-else:
-    st.info("Upload documents or use the Developer Test Panel to load sample documents.")
+                """, unsafe_allow_html=True)
+                
+            except Exception as e:
+                st.error(f"Failed to process {os.path.basename(file_path)}: {str(e)}")
+                import traceback
+                st.sidebar.code(traceback.format_exc())
+    else:
+        st.info("Upload documents or use the Developer Test Panel to load sample documents.")
+
+with tab2:
+    st.markdown('<div class="section-title">🔍 Semantic Query Interface</div>', unsafe_allow_html=True)
+    
+    query = st.text_input(
+        "Ask a question or enter query terms:",
+        value="What causes seal leakage in pump P-101?",
+        placeholder="e.g. What causes seal leakage in pump P-101?"
+    )
+    
+    col1, col2 = st.columns([3, 1])
+    with col2:
+        top_k = st.slider("Results (k)", min_value=1, max_value=10, value=3)
+    with col1:
+        st.write("")  # Alignment spacing
+        st.write("")
+        search_clicked = st.button("Search Knowledge Base", use_container_width=True, type="primary")
+        
+    if search_clicked or query:
+        if query.strip():
+            with st.spinner("Searching vector database..."):
+                try:
+                    results = search(query, top_k=top_k)
+                    
+                    if results and 'documents' in results and results['documents'] and len(results['documents'][0]) > 0:
+                        docs = results['documents'][0]
+                        ids = results['ids'][0] if 'ids' in results else []
+                        metadatas = results['metadatas'][0] if 'metadatas' in results else []
+                        distances = results['distances'][0] if 'distances' in results else []
+                        
+                        st.markdown(f"### Found {len(docs)} matching chunks:")
+                        
+                        for i, doc in enumerate(docs):
+                            doc_id = ids[i] if i < len(ids) else f"chunk_{i}"
+                            meta = metadatas[i] if i < len(metadatas) else {}
+                            dist = distances[i] if i < len(distances) else 0.0
+                            
+                            # Convert distance to approximate percentage match
+                            match_score = max(0.0, min(100.0, (2.0 - dist) / 2.0 * 100.0))
+                            
+                            source = meta.get('source', 'Unknown')
+                            page = meta.get('page', 'Unknown')
+                            assets = meta.get('asset_ids', 'None')
+                            
+                            badge_color = "#38bdf8"
+                            if source.endswith(".pdf"):
+                                badge_color = "#f87171"
+                            elif source.endswith(".xlsx") or source.endswith(".xls"):
+                                badge_color = "#34d399"
+                            elif source.endswith(".docx"):
+                                badge_color = "#60a5fa"
+                            elif source.endswith(".jpg") or source.endswith(".jpeg") or source.endswith(".png"):
+                                badge_color = "#c084fc"
+                            
+                            st.markdown(f"""
+                            <div class="result-card" style="border: 1px solid rgba(255,255,255,0.06); border-radius:12px; padding:20px; background-color:#0f172a; margin-bottom:20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1)">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                                    <div style="font-size:1.1rem; font-weight:600; color:#f8fafc;">
+                                        Result {i+1} <span style="font-size:0.8rem; font-family:monospace; color:#64748b;">({doc_id})</span>
+                                    </div>
+                                    <span style="background-color:rgba(52, 211, 153, 0.1); color:#34d399; border: 1px solid rgba(52, 211, 153, 0.2); padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:bold;">
+                                        {match_score:.1f}% Match
+                                    </span>
+                                </div>
+                                <div style="display:flex; flex-wrap:wrap; gap:10px; gap-row:5px; margin-bottom:12px; font-size:0.85rem; color:#94a3b8;">
+                                    <div><strong>Source:</strong> <span style="color:{badge_color};">{source}</span></div>
+                                    <div><strong>Page:</strong> <span style="color:#cbd5e1;">{page}</span></div>
+                                    <div><strong>Assets:</strong> <span style="color:#cbd5e1; font-weight:600;">{assets}</span></div>
+                                </div>
+                                <div style="background-color:#020617; border: 1px solid rgba(255,255,255,0.04); border-radius:6px; padding:12px; font-family:sans-serif; font-size:0.92rem; color:#cbd5e1; line-height:1.5;">
+                                    {doc}
+                                </div>
+                            </div>
+                            """, unsafe_allow_html=True)
+                    else:
+                        st.info("No matching chunks found in the database. Try re-indexing or asking a different question.")
+                except Exception as e:
+                    st.error(f"Search failed: {e}")
+                    st.exception(e)
+                    
+    st.markdown("---")
+    st.markdown("### 🔄 Index Management")
+    if st.button("Force Re-index Vector Store", use_container_width=True):
+        with st.spinner("Re-indexing chunks into ChromaDB..."):
+            try:
+                count = index_chunks()
+                st.success(f"Successfully re-indexed {count} chunks in ChromaDB!")
+            except Exception as e:
+                st.error(f"Re-indexing failed: {e}")

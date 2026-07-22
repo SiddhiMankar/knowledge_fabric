@@ -106,4 +106,13 @@ def save_chunks(new_chunks: list, output_path: str = 'data/processed/chunks.json
     with open(output_path, 'w', encoding='utf-8') as f:
         json.dump(combined_chunks, f, indent=2, ensure_ascii=False)
         
+    # Automatically sync with ChromaDB vector store
+    try:
+        from retrieval.vector_store import index_chunks
+        print("Syncing ChromaDB vector store with updated chunks...")
+        index_chunks(output_path)
+    except Exception as e:
+        print(f"Warning: Failed to automatically sync ChromaDB: {e}")
+        
     return combined_chunks
+
